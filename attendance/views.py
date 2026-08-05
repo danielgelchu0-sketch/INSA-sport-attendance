@@ -132,3 +132,20 @@ def api_checkin(request):
         'message': msg,
         'record': AttendanceRecordSerializer(record).data
     }, status=status.HTTP_201_CREATED)
+
+@api_view(['PATCH'])
+@permission_classes([IsMentor])
+def update_session_time(request):
+    """Mentor/instructor updates today's start_time and late_until."""
+    session = get_or_create_today_session()
+    start_time = request.data.get('start_time')
+    late_until = request.data.get('late_until')
+
+    if not start_time or not late_until:
+        return Response({'error': 'Both start_time and late_until are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    session.start_time = start_time
+    session.late_until = late_until
+    session.save(update_fields=['start_time', 'late_until'])
+
+    return Response(SportsSessionSerializer(session).data)

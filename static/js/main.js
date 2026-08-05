@@ -26,30 +26,63 @@ async function init() {
     renderLogin();
   }
 }
-
 function renderLogin() {
   document.getElementById('app').innerHTML = `
     <form id="loginForm">
-      <h2>Login</h2>
+      <h2 id="formTitle">Login</h2>
       <input id="username" placeholder="Username" required>
+      <div id="signupFields" style="display:none">
+        <input id="firstName" placeholder="First Name">
+        <input id="lastName" placeholder="Last Name">
+        <input id="email" type="email" placeholder="Email">
+        <input id="phone" placeholder="Phone">
+      </div>
       <input id="password" type="password" placeholder="Password" required>
-      <button type="submit">Log In</button>
+      <button type="submit" id="submitBtn">Log In</button>
       <p id="loginError" style="color:red"></p>
+      <p style="text-align:center">
+        <a href="#" id="toggleMode">Don't have an account? Sign up</a>
+      </p>
     </form>`;
+
+  let isSignup = false;
+  document.getElementById('toggleMode').onclick = (e) => {
+    e.preventDefault();
+    isSignup = !isSignup;
+    document.getElementById('formTitle').textContent = isSignup ? 'Sign Up' : 'Login';
+    document.getElementById('submitBtn').textContent = isSignup ? 'Create Account' : 'Log In';
+    document.getElementById('signupFields').style.display = isSignup ? 'block' : 'none';
+    document.getElementById('toggleMode').textContent = isSignup
+      ? 'Already have an account? Log in'
+      : "Don't have an account? Sign up";
+  };
+
   document.getElementById('loginForm').onsubmit = async (e) => {
     e.preventDefault();
+    const errEl = document.getElementById('loginError');
     try {
-      const user = await api('/auth/login/', 'POST', {
-        username: document.getElementById('username').value,
-        password: document.getElementById('password').value
-      });
+      let user;
+      if (isSignup) {
+        user = await api('/auth/register/', 'POST', {
+          username: document.getElementById('username').value,
+          password: document.getElementById('password').value,
+          first_name: document.getElementById('firstName').value,
+          last_name: document.getElementById('lastName').value,
+          email: document.getElementById('email').value,
+          phone: document.getElementById('phone').value
+        });
+      } else {
+        user = await api('/auth/login/', 'POST', {
+          username: document.getElementById('username').value,
+          password: document.getElementById('password').value
+        });
+      }
       renderApp(user.role);
     } catch (err) {
-      document.getElementById('loginError').textContent = err.detail || 'Login failed';
+      errEl.textContent = err.detail || JSON.stringify(err) || 'Something went wrong';
     }
   };
 }
-
 function renderApp(role) {
   document.getElementById('app').innerHTML = `<div id="content"></div><button id="logout">Logout</button>`;
   document.getElementById('logout').onclick = async () => { await api('/auth/logout/', 'POST'); renderLogin(); };
@@ -97,6 +130,12 @@ async function renderMentorDashboard() {
   document.getElementById('content').innerHTML = `
     <h2>Mentor Dashboard – ${data.session.date}</h2>
     <p>Total: ${data.total} | Present: ${c.present} | Late: ${c.late} | Absent: ${c.absent} | Not marked: ${c.not_marked}</p>
+    <div style="display:flex;gap:10px;align-items:center;margin:12px 0">
+      <label>Start: <input type="time" id="startTime" value="${data.session.start_time.slice(0,5)}"></label>
+      <label>Late until: <input type="time" id="lateTime" value="${data.session.late_until.slice(0,5)}"></label>
+      <button id="saveTimeBtn" style="width:auto;padding:8px 16px">Save Time</button>
+    </div>
+    <p id="timeMsg" style="color:green"></p>
     <div id="qrDisplay"></div>
     <input id="search" placeholder="Search student...">
     <table border="1" id="table"><thead><tr><th>Student</th><th>Status</th><th>Note</th><th>Action</th></tr></thead><tbody></tbody></table>`;
@@ -126,6 +165,18 @@ async function renderMentorDashboard() {
       });
   }
   renderRows();
+  document.getElementById('saveTimeBtn').onclick = async () => {
+    try {
+      await api('/mentor/session/time/', 'PATCH', {
+        start_time: document.getElementById('startTime').value + ':00',
+        late_until: document.getElementById('lateTime').value + ':00'
+      });
+      document.getElementById('timeMsg').textContent = 'Saved!';
+      setTimeout(() => document.getElementById('timeMsg').textContent = '', 2000);
+    } catch (err) {
+      document.getElementById('timeMsg').textContent = 'Error saving time';
+    }
+  };
   new QRCode(document.getElementById('qrDisplay'), qr.qr_token);
   document.getElementById('search').oninput = (e) => renderRows(e.target.value);
 }

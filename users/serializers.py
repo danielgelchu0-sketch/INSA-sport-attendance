@@ -13,11 +13,12 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['username', 'password', 'first_name', 'last_name', 'email', 'role', 'phone']
+        fields = ['username', 'password', 'first_name', 'last_name', 'email', 'phone']  # role removed
 
     def create(self, validated_data):
         password = validated_data.pop('password')
-        user = User(**validated_data)
+        user = User(**validated_data, role='student')  # forced, not user-controlled
         user.set_password(password)
         user.save()
         return user
+        
