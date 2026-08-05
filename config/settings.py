@@ -5,12 +5,12 @@ import os
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-i3tmsh3(b3zw+c4+^3i)n1-e=!62&e@@02g(2zzjlqcu&k@ov6'
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'temporary-fallback-change-this')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '192.168.154.112']
+ALLOWED_HOSTS = ['DaniINSA.pythonanywhere.com']
 
 
 # Application definition
@@ -99,3 +99,4 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticated',
     ],
 }
+STATIC_ROOT = BASE_DIR / 'staticfiles'
