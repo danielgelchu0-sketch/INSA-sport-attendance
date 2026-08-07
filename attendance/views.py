@@ -9,6 +9,7 @@ from .models import AttendanceRecord
 from .serializers import AttendanceRecordSerializer, SportsSessionSerializer, DashboardRecordSerializer
 from .utils import get_or_create_today_session, evaluate_checkin_status, get_current_qr_token
 from .permissions import IsMentor
+from .models import SportsSession
 
 User = get_user_model()
 
@@ -149,3 +150,54 @@ def update_session_time(request):
     session.save(update_fields=['start_time', 'late_until'])
 
     return Response(SportsSessionSerializer(session).data)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def student_history(request):
+    """Student-only: their own attendance across all past sessions."""
+    records = AttendanceRecord.objects.filter(
+        student=request.user
+    ).select_related('session').order_by('-session__date')
+
+    data = [{
+        'date': r.session.date,
+        'status': r.status,
+        'checked_in_at': r.checked_in_at,
+        'note': r.note
+    } for r in records]
+
+    return Response({'history': data})
+
+
+@api_view(['GET'])
+@permission_classes([IsMentor])
+def session_history(request):
+    """Mentor-only: list of all past sessions with summary counts."""
+    sessions = SportsSession.objects.all().order_by('-date')
+
+    data = []
+    for s in sessions:
+        records = AttendanceRecord.objects.filter(session=s)
+        data.append({
+            'date': s.date,
+            'is_closed': s.is_closed,
+            'present': records.filter(status='present').count(),
+            'late': records.filter(status='late').count(),
+            'absent': records.filter(status='absent').count(),
+        })
+
+    return Response({'sessions': data})
+
+
+@api_view(['GET'])
+@permission_classes([IsMentor])
+def session_detail(request, date):
+    """Mentor-only: full student list + statuses for one specific past date."""
+    session = SportsSession.objects.filter(date=date).first()
+    if not session:
+        return Response({'error': 'No session found for that date.'}, status=status.HTTP_404_NOT_FOUND)
+
+    records = AttendanceRecord.objects.filter(session=session).select_related('student')
+    rows = [DashboardRecordSerializer(r).data for r in records]
+
+    return Response({'date': session.date, 'students': rows})

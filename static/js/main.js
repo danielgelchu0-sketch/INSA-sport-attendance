@@ -96,13 +96,25 @@ async function renderStudentView() {
   document.getElementById('content').innerHTML = `
     <h2>Today: ${data.session.date}</h2>
     <p>Status: <b>${rec ? rec.status.toUpperCase() : 'NOT CHECKED IN'}</b></p>
+    <button id="historyBtn" style="width:auto;padding:8px 16px">View My History</button>
+    <div id="historyList"></div>
     ${!rec ? `
       <button id="scanBtn">Scan QR to Check In</button>
       <div id="reader" style="width:300px"></div>
       <p id="checkinMsg"></p>` : ''}`;
 
+      document.getElementById('historyBtn').onclick = async () => {
+    const hist = await api('/history/');
+    const html = hist.history.map(h => `
+      <tr><td>${h.date}</td><td>${h.status}</td><td>${h.note || ''}</td></tr>`).join('');
+    document.getElementById('historyList').innerHTML = `
+      <table border="1"><thead><tr><th>Date</th><th>Status</th><th>Note</th></tr></thead>
+      <tbody>${html}</tbody></table>`;
+  };
+
   const scanBtn = document.getElementById('scanBtn');
   if (scanBtn) scanBtn.onclick = () => {
+
     scanBtn.style.display = 'none';
     const qr = new Html5Qrcode("reader");
     qr.start(
@@ -119,7 +131,7 @@ async function renderStudentView() {
           document.getElementById('checkinMsg').textContent = err.error || 'Error';
         }
       },
-      () => {} // ignore per-frame scan failures
+      () => {} 
     );
   };
 }
@@ -137,6 +149,8 @@ async function renderMentorDashboard() {
     </div>
     <p id="timeMsg" style="color:green"></p>
     <div id="qrDisplay"></div>
+    <button id="historyBtn" style="width:auto;padding:8px 16px;margin-bottom:8px">View Past Sessions</button>
+    <div id="pastSessions"></div>
     <input id="search" placeholder="Search student...">
     <table border="1" id="table"><thead><tr><th>Student</th><th>Status</th><th>Note</th><th>Action</th></tr></thead><tbody></tbody></table>`;
   const tbody = document.querySelector('#table tbody');
@@ -178,6 +192,28 @@ async function renderMentorDashboard() {
     }
   };
   new QRCode(document.getElementById('qrDisplay'), qr.qr_token);
+  document.getElementById('historyBtn').onclick = async () => {
+    const data2 = await api('/mentor/sessions/');
+    const rows = data2.sessions.map(s => `
+      <tr style="cursor:pointer" data-date="${s.date}">
+        <td>${s.date}</td><td>${s.is_closed ? 'Closed' : 'Open'}</td>
+        <td>${s.present}</td><td>${s.late}</td><td>${s.absent}</td>
+      </tr>`).join('');
+    const container = document.getElementById('pastSessions');
+    container.innerHTML = `
+      <table border="1"><thead><tr><th>Date</th><th>Status</th><th>Present</th><th>Late</th><th>Absent</th></tr></thead>
+      <tbody>${rows}</tbody></table><div id="sessionDetail"></div>`;
+    container.querySelectorAll('tr[data-date]').forEach(tr => {
+      tr.onclick = async () => {
+        const detail = await api(`/mentor/sessions/${tr.dataset.date}/`);
+        const detailRows = detail.students.map(s => `
+          <tr><td>${s.full_name}</td><td>${s.status}</td></tr>`).join('');
+        document.getElementById('sessionDetail').innerHTML = `
+          <h3>${detail.date}</h3>
+          <table border="1"><thead><tr><th>Student</th><th>Status</th></tr></thead><tbody>${detailRows}</tbody></table>`;
+      };
+    });
+  };
   document.getElementById('search').oninput = (e) => renderRows(e.target.value);
 }
 
